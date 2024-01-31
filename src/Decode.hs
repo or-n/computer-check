@@ -14,6 +14,7 @@ name = do
     rest <- many (letter <|> digit <|> char '_' <|> char '\'')
     return (first : rest)
 
+-- 2.1.3
 decode :: String -> Either ParseError Term
 decode = parse term "" where
     refer = Refer <$> name

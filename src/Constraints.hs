@@ -10,6 +10,7 @@ import Control.Applicative ((<|>))
 
 type Pair = (TermType, TermType)
 
+-- 2.4
 gen_equations :: Env -> TermType -> Term -> Maybe [Pair]
 gen_equations init_env init_target_type term = fst <$> result where
     result = go init_env init_target_type term
@@ -49,6 +50,7 @@ empty_env = Env
     , let_count = 0
     }
 
+-- 2.5.1
 occurs_in :: String -> TermType -> Bool
 occurs_in checked_name = go where
     go = \case
@@ -59,12 +61,14 @@ occurs_in checked_name = go where
         Distance ->
             False
 
+-- 2.5.2
 substitute :: String -> TermType -> [Pair] -> [Pair]
 substitute substituted_name substituted_type =
     map (\(left, right) -> (go left, go right))
     where
     go = TermType.substitute substituted_name substituted_type
 
+-- 2.5.4
 resolve :: [Pair] -> IO [Pair]
 resolve equations =
     if length equations > 1 then
@@ -80,6 +84,7 @@ resolve equations =
     branch = concatMap . \step pair -> case step pair of
         Just new -> new
         _ -> [pair]
+    -- 2.5.3
     unification_step_same (left, right) =
         if left == right then
             Just []
@@ -97,6 +102,7 @@ resolve equations =
         (from_right, to_right) <- get_arrow right
         Just [(from_left, from_right), (to_left, to_right)]
 
+-- 2.5.4
 infer :: Term -> IO (Maybe TermType)
 infer term = case gen_equations empty_env (Generic "target") term of
     Just equations -> do
