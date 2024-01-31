@@ -24,11 +24,10 @@ strict_step term = do
 	(name, usage) <- get_assume (run_strict process)
 	Just $ substitute name input usage
 
-print_strict_steps :: Int -> Term -> IO (Maybe ())
-print_strict_steps seconds = timeout (seconds * 1000000) . go where
-	go term = case strict_step term of
-		Just new_term -> do
-			print new_term
-			go new_term
-		_ ->
-			return ()
+print_strict_steps :: Term -> IO ()
+print_strict_steps term = case strict_step term of
+	Just new_term -> do
+		print new_term
+		print_strict_steps new_term
+	_ ->
+		return ()

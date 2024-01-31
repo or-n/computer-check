@@ -65,12 +65,12 @@ substitute substituted_name substituted_type =
     where
     go = TermType.substitute substituted_name substituted_type
 
-resolve :: [Pair] -> [Pair]
+resolve :: [Pair] -> IO [Pair]
 resolve equations =
     if length equations > 1 then
         resolve . shrink_modifying_rest . shrink . expand $ equations
     else
-        equations
+        return equations
     where
     expand = branch unification_step_match
     shrink = branch unification_step_same
@@ -97,8 +97,12 @@ resolve equations =
         (from_right, to_right) <- get_arrow right
         Just [(from_left, from_right), (to_left, to_right)]
 
-infer :: Term -> Maybe TermType
-infer term = case resolve <$> gen_equations empty_env (Generic "target") term of
-    Just [(Generic _, x)] -> Just x
-    Just [(x, Generic _)] -> Just x
-    _ -> Nothing
+infer :: Term -> IO (Maybe TermType)
+infer term = case gen_equations empty_env (Generic "target") term of
+    Just equations -> do
+        result <- resolve equations
+        return $ case result of
+            [(Generic _, x)] -> Just x
+            [(x, Generic _)] -> Just x
+            _ -> Nothing
+    _ -> return Nothing

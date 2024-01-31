@@ -3,6 +3,8 @@ module Main (main) where
 import Term
 import Decode
 import Constraints
+import System.Timeout (timeout)
+import Run
 
 main :: IO ()
 main = do
@@ -21,7 +23,11 @@ test text = do
             putStr "Renamed: "
             print (unique_names term)
             putStr "Inferred type: "
-            print (infer term)
+            t <- timeout 1000000 (infer term)
+            print t
+            putStrLn "Reduction steps: "
+            _ <- timeout 1000000 (print_strict_steps term)
+            putStrLn ""
         _ -> do
             putStr "Counldn't decode: "
             putStrLn text
