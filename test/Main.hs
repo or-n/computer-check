@@ -13,6 +13,8 @@ main = do
     test "x: x"
     test "(x: x) (x: x)"
     test "x: x x"
+    test "@f := (x: x) in f 69"
+    test "2137, (69, ())"
 
 test :: String -> IO ()
 test text = do
@@ -27,7 +29,8 @@ test text = do
             print t
             putStrLn "Reduction steps: "
             _ <- timeout 1000000 (print_strict_steps term)
-            putStrLn ""
+            return ()
         _ -> do
-            putStr "Counldn't decode: "
+            putStr "Couldn't decode: "
             putStrLn text
+    putStrLn ""

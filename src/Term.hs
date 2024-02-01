@@ -3,13 +3,19 @@ module Term where
 
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
-import Util (parens)
+import Util (try_parens, UniqueNames, go, ShowParens, show_parens)
+import qualified DistanceExtension
+import qualified ListExtension
 
 -- 2.1.1
 data Term
 	= Refer String
 	| Supply Term Term
 	| Assume String Term
+	-- 3.1
+	| DistanceExtension (DistanceExtension.Term Term)
+	| ListExtension (ListExtension.Term Term)
+	| Define String Term Term
 
 get_assume :: Term -> Maybe (String, Term)
 get_assume = \case
@@ -21,20 +27,28 @@ get_supply = \case
 	Supply process input -> Just (process, input)
 	_ -> Nothing
 
--- 2.1.2
 instance Show Term where
-	show = go True where
-		go in_parens = \case
-			Refer name ->
-				name
-			Supply process input ->
-				parens in_parens $ concat [go True process, " ", go True input]
-			Assume name usage ->
-				parens in_parens $ concat [name, ": ", go False usage]
+	show = show_parens True
+
+instance ShowParens Term where
+	show_parens should = \case
+		-- 2.1.2
+		Refer name ->
+			name
+		Supply process input ->
+			try_parens should [show_parens True process, " ", show_parens True input]
+		Assume name usage ->
+			try_parens should [name, ": ", show_parens False usage]
+		-- 3.1
+		DistanceExtension extension ->
+			show_parens should extension
+		ListExtension extension ->
+			show_parens should extension
+		Define name definition usage ->
+			try_parens should ["@", name, ":= ", show_parens True definition, " in ", show_parens False usage]
 
 -- 2.2.1
-unique_names :: Term -> Term
-unique_names = go Map.empty where
+instance UniqueNames Term where
 	go bound = \case
 		Refer name ->
 			Refer $ fromMaybe name (Map.lookup name bound)
@@ -44,6 +58,19 @@ unique_names = go Map.empty where
 			Assume new_name (go (Map.insert name new_name bound) usage)
 			where
 			new_name = find_unique bound name
+		-- 3.1
+		DistanceExtension extension ->
+			DistanceExtension (go bound extension)
+		ListExtension extension ->
+			ListExtension (go bound extension)
+		Define name definition usage ->
+			Define new_name (go new_bound definition) (go new_bound usage)
+			where
+			new_bound = Map.insert name new_name bound
+			new_name = find_unique bound name
+
+unique_names :: Term -> Term
+unique_names = go Map.empty
 
 find_unique :: Map.Map String a -> String -> String
 find_unique taken name =

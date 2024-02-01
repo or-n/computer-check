@@ -34,6 +34,25 @@ gen_equations init_env init_target_type term = fst <$> result where
                     }
             (usage_equations, env3) <- go env2 to usage
             Just ((target_type, Arrow from to) : usage_equations, env3)
+        -- 3.2
+        {-Value distance ->
+            Just ([(Distance, target_type)], env)
+        Add a b -> do
+            let a_type = Generic ("let" ++ show (let_count env + 1))
+            let b_type = Generic ("let" ++ show (let_count env + 2))
+            let env2 = env { let_count = let_count env + 2 }
+            (a_equations, env3) <- go env2 Distance a
+            (b_equations, env4) <- go env3 Distance b
+            Just (a_equations ++ b_equations, env4)
+        Sub a b -> do
+            let a_type = Generic ("let" ++ show (let_count env + 1))
+            let b_type = Generic ("let" ++ show (let_count env + 2))
+            let env2 = env { let_count = let_count env + 2 }
+            (a_equations, env3) <- go env2 Distance a
+            (b_equations, env4) <- go env3 Distance b
+            Just (a_equations ++ b_equations, env4)-}
+        _ ->
+            Nothing
 
 data Env = Env
     { types :: Map.Map String TermType

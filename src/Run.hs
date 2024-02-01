@@ -2,19 +2,19 @@
 module Run where
 
 import Term
-import System.Timeout (timeout)
+import Util (Substitute, substitute)
 
 -- 2.2.2
-substitute :: String -> Term -> Term -> Term
-substitute substituted_name term = go where
-	go = \case
-		Refer name | name == substituted_name ->
-			term
-		Supply process input ->
-			Supply (go process) (go input)
-		Assume name usage | name /= substituted_name ->
-			Assume name (go usage)
-		x -> x
+instance Substitute Term where
+	substitute substituted_name term = go where
+		go = \case
+			Refer name | name == substituted_name ->
+				term
+			Supply process input ->
+				Supply (go process) (go input)
+			Assume name usage | name /= substituted_name ->
+				Assume name (go usage)
+			x -> x
 
 -- 2.2.3
 run_strict :: Term -> Term

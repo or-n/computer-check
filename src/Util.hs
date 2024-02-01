@@ -1,6 +1,8 @@
 {-# LANGUAGE LambdaCase #-}
 module Util where
 
+import qualified Data.Map as Map
+
 parens :: Bool -> String -> String
 parens in_parens x = if in_parens then concat ["(", x, ")"] else x
 
@@ -11,3 +13,14 @@ find_first f = go [] where
             Just y -> Just (y, rev_before ++ after)
             _ -> go (x : rev_before) after
         _ -> Nothing
+
+class ShowParens a where
+    show_parens :: Bool -> a -> String
+
+try_parens in_parens = parens in_parens . concat
+
+class UniqueNames a where
+	go :: Map.Map String String -> a -> a
+
+class Substitute a where
+    substitute :: String -> a -> a -> a
