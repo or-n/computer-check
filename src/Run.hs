@@ -1,20 +1,25 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase, MultiParamTypeClasses #-}
 module Run where
 
 import Term
+import qualified DistanceExtension
 import Util (Substitute, substitute)
 
 -- 2.2.2
-instance Substitute Term where
-	substitute substituted_name term = go where
-		go = \case
-			Refer name | name == substituted_name ->
-				term
-			Supply process input ->
-				Supply (go process) (go input)
-			Assume name usage | name /= substituted_name ->
-				Assume name (go usage)
-			x -> x
+instance Substitute Term Term where
+	substitute substituted_name term = \case
+		Refer name | name == substituted_name ->
+			term
+		Supply process input ->
+			Supply (go process) (go input)
+		Assume name usage | name /= substituted_name ->
+			Assume name (go usage)
+		DistanceExtension extension -> DistanceExtension $
+			substitute substituted_name term extension
+		Define name definition usage | name /= substituted_name ->
+			Define name (go definition) (go usage)
+		x -> x
+		where go = substitute substituted_name term
 
 -- 2.2.3
 run_strict :: Term -> Term
@@ -22,10 +27,44 @@ run_strict term = maybe term run_strict (strict_step term)
 
 -- 2.2.3
 strict_step :: Term -> Maybe Term
-strict_step term = do
-	(process, input) <- get_supply term
-	(name, usage) <- get_assume (run_strict process)
-	Just $ substitute name input usage
+strict_step term =
+	case term of
+		Supply process input -> case strict_step input of
+			Just input' ->
+				Just (Supply process input')
+			_ -> do
+				(name, usage) <- get_assume (run_strict process)
+				Just (substitute name input usage)
+		DistanceExtension extension -> do
+			let value x = get_distance_extension x
+				>>= DistanceExtension.get_value
+			case extension of
+				DistanceExtension.Add a b -> do
+					a_value <- value (run_strict a)
+					b_value <- value (run_strict b)
+					let v = DistanceExtension.Value (a_value + b_value)
+					Just (DistanceExtension v)
+				DistanceExtension.Sub a b -> do
+					a_value <- value (run_strict a)
+					b_value <- value (run_strict b)
+					let v = DistanceExtension.Value (a_value - b_value)
+					Just (DistanceExtension v)
+				DistanceExtension.IfZero x yes no ->
+					case strict_step x of
+						Just x' -> do
+							let v = DistanceExtension.IfZero x' yes no
+							Just (DistanceExtension v)
+						_ -> do
+							x_value <- value x
+							Just (if x_value == 0 then yes else no)
+				_ ->
+					Nothing
+		Define name definition usage -> do
+			let v = run_strict definition
+			let v' = substitute name (Define name definition (Refer name)) v
+			Just (substitute name v' usage)
+		_ ->
+			Nothing
 
 -- 2.2.4
 print_strict_steps :: Term -> IO ()

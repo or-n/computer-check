@@ -27,6 +27,11 @@ get_supply = \case
 	Supply process input -> Just (process, input)
 	_ -> Nothing
 
+get_distance_extension :: Term -> Maybe (DistanceExtension.Term Term)
+get_distance_extension = \case
+	DistanceExtension extension -> Just extension
+	_ -> Nothing
+
 instance Show Term where
 	show = show_parens True
 
@@ -45,7 +50,7 @@ instance ShowParens Term where
 		ListExtension extension ->
 			show_parens should extension
 		Define name definition usage ->
-			try_parens should ["@", name, ":= ", show_parens True definition, " in ", show_parens False usage]
+			try_parens should ["@", name, " := ", show_parens True definition, " in ", show_parens False usage]
 
 -- 2.2.1
 instance UniqueNames Term where

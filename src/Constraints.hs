@@ -7,6 +7,8 @@ import qualified Data.Map as Map
 import Data.Tuple (swap)
 import Util (find_first)
 import Control.Applicative ((<|>))
+import qualified DistanceExtension
+import Data.List (nub)
 
 type Pair = (TermType, TermType)
 
@@ -35,22 +37,24 @@ gen_equations init_env init_target_type term = fst <$> result where
             (usage_equations, env3) <- go env2 to usage
             Just ((target_type, Arrow from to) : usage_equations, env3)
         -- 3.2
-        {-Value distance ->
-            Just ([(Distance, target_type)], env)
-        Add a b -> do
-            let a_type = Generic ("let" ++ show (let_count env + 1))
-            let b_type = Generic ("let" ++ show (let_count env + 2))
-            let env2 = env { let_count = let_count env + 2 }
-            (a_equations, env3) <- go env2 Distance a
-            (b_equations, env4) <- go env3 Distance b
-            Just (a_equations ++ b_equations, env4)
-        Sub a b -> do
-            let a_type = Generic ("let" ++ show (let_count env + 1))
-            let b_type = Generic ("let" ++ show (let_count env + 2))
-            let env2 = env { let_count = let_count env + 2 }
-            (a_equations, env3) <- go env2 Distance a
-            (b_equations, env4) <- go env3 Distance b
-            Just (a_equations ++ b_equations, env4)-}
+        DistanceExtension extension -> case extension of
+            DistanceExtension.Value distance ->
+                Just ([(target_type, Distance)], env)
+            DistanceExtension.Add a b -> do
+                (a_equations, env2) <- go env Distance a
+                (b_equations, env3) <- go env2 Distance b
+                let both = a_equations ++ b_equations
+                Just ((target_type, Distance) : both, env3)
+            DistanceExtension.Sub a b -> do
+                (a_equations, env2) <- go env Distance a
+                (b_equations, env3) <- go env2 Distance b
+                let both = a_equations ++ b_equations
+                Just ((target_type, Distance) : both, env3)
+            DistanceExtension.IfZero x yes no -> do
+                (x_equations, env2) <- go env Distance x
+                (yes_equations, env3) <- go env2 target_type yes
+                (no_equations, env4) <- go env3 target_type no
+                Just (x_equations ++ yes_equations ++ no_equations, env4)
         _ ->
             Nothing
 
@@ -125,7 +129,7 @@ resolve equations =
 infer :: Term -> IO (Maybe TermType)
 infer term = case gen_equations empty_env (Generic "target") term of
     Just equations -> do
-        result <- resolve equations
+        result <- resolve (nub equations)
         return $ case result of
             [(Generic _, x)] -> Just x
             [(x, Generic _)] -> Just x

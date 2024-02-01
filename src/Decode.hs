@@ -21,16 +21,18 @@ decode :: String -> Either ParseError Term
 decode = parse term "" where
     refer = Refer <$> name
     supply = do
-        process <- parens term <|> refer
+        process <- parens term <|> atom
         _ <- space
-        input <- parens term <|> refer
+        input <- parens term <|> atom
         return (Supply process input)
     assume = do
         n <- name
         _ <- string ": "
         usage <- term
         return (Assume n usage)
-    term = try assume <|> try supply <|> extensions <|> atom
+    term = do
+        x <- try assume <|> extensions <|> try supply <|> atom
+        suffix x
     define = do
         _ <- char '@'
         n <- name
@@ -44,21 +46,21 @@ decode = parse term "" where
         try add <|> try sub <|> try if_zero
         ) where
         add = do
-            a <- parens term
+            a <- parens term <|> atom
             _ <- string " + "
-            b <- parens term
+            b <- parens term <|> atom
             return ( (DistanceExtension.Add a b))
         sub = do
-            a <- parens term
+            a <- parens term <|> atom
             _ <- string " - "
-            b <- parens term
+            b <- parens term <|> atom
             return ( (DistanceExtension.Sub a b))
         if_zero = do
-            x <- parens term
-            _ <- string " 0? "
-            yes <- parens term
+            x <- parens term <|> atom
+            _ <- string " z? "
+            yes <- parens term <|> atom
             _ <- string " : "
-            no <- parens term
+            no <- parens term <|> atom
             return (DistanceExtension.IfZero x yes no)
     distance_value :: Parser Term
     distance_value = do
@@ -70,21 +72,13 @@ decode = parse term "" where
         return (ListExtension ListExtension.End)
     atom = distance_value <|> end <|> refer
     list_extension = ListExtension <$> (
-        try push <|> try top <|> try rest <|> try if_empty
+        try push <|> try if_empty
         ) where
         push = do
             top' <- try atom <|> parens term
             _ <- string ", "
             rest' <- try atom <|> parens term
             return (ListExtension.Push top' rest')
-        top = do
-            pair <- parens term
-            _ <- string ".top"
-            return (ListExtension.Top pair)
-        rest = do
-            pair <- parens term
-            _ <- string ".rest"
-            return (ListExtension.Rest pair)
         if_empty = do
             x <- parens term
             _ <- string " ()? "
@@ -92,3 +86,14 @@ decode = parse term "" where
             _ <- string " : "
             no <- parens term
             return (ListExtension.IfEmpty x yes no)
+    suffix :: Term -> Parser Term
+    suffix x =
+        try (top x) <|> try (rest x) <|> return x
+    top :: Term -> Parser Term
+    top x = do
+        _ <- string ".top"
+        return (ListExtension (ListExtension.Top x))
+    rest :: Term -> Parser Term
+    rest x = do
+        _ <- string ".rest"
+        return (ListExtension (ListExtension.Rest x))

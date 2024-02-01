@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase, MultiParamTypeClasses #-}
 module Util where
 
 import qualified Data.Map as Map
@@ -22,5 +22,5 @@ try_parens in_parens = parens in_parens . concat
 class UniqueNames a where
 	go :: Map.Map String String -> a -> a
 
-class Substitute a where
-    substitute :: String -> a -> a -> a
+class Substitute t a where
+    substitute :: String -> t -> a -> a

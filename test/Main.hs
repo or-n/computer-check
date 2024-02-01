@@ -1,6 +1,7 @@
 module Main (main) where
 
 import Term
+import TermType
 import Decode
 import Constraints
 import System.Timeout (timeout)
@@ -13,8 +14,18 @@ main = do
     test "x: x"
     test "(x: x) (x: x)"
     test "x: x x"
-    test "@f := (x: x) in f 69"
-    test "2137, (69, ())"
+    --test "@f := (x: f x) in f 69"
+    test "1 + 1"
+    test "0 z? 1 : 2"
+    {-let r = gen_equations empty_env (Generic "target") <$> decode "0 z? 1 : 2"
+    case r of
+        Right (Just equations) -> do
+            x <- resolve equations
+            print x-}
+    test "2 - 1"
+    test "(x: x z? 42 : (f (x - 1))) 2"
+    test "@f := (x: x z? 42 : (f (x - 1))) in f 2"
+    test "(2137, (69, ())).rest"
 
 test :: String -> IO ()
 test text = do
