@@ -30,9 +30,9 @@ instance ShowParens a => ShowParens (Term a) where
         Push top rest ->
             try_parens should [show_parens False top, ", ", show_parens True rest]
         Top pair ->
-            try_parens should [show_parens False pair, ".top"]
+            try_parens should [show_parens True pair, ".top"]
         Rest pair ->
-            try_parens should [show_parens False pair, ".rest"]
+            try_parens should [show_parens True pair, ".rest"]
         IfEmpty x yes no ->
 			try_parens should [
                 show_parens True x,

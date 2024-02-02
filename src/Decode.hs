@@ -31,7 +31,7 @@ decode = parse term "" where
         usage <- term
         return (Assume n usage)
     term = do
-        x <- parens term <|> try assume <|> extensions <|> try supply <|> atom
+        x <- try assume <|> extensions <|> try supply <|> parens term <|> atom
         suffix x
     define = do
         _ <- char '@'

@@ -17,7 +17,7 @@ main = do
     --test "@f := (x: f x) in f 69"
     test "1 + 1"
     test "0 z? 1 : 2"
-    {-let r = gen_equations empty_env (Generic "target") <$> decode "0 z? 1 : 2"
+    {-let r = gen_equations empty_env (Generic "target") <$> decode "((2137, (69, ())).rest).top"
     case r of
         Right (Just equations) -> do
             x <- resolve equations
@@ -25,6 +25,7 @@ main = do
     test "2 - 1"
     test "(x: x z? 42 : (f (x - 1))) 2"
     test "@f := (x: x z? 42 : (f (x - 1))) in f 2"
+    test "(2137, (69, ())).rest"
     test "((2137, (69, ())).rest).top"
 
 test :: String -> IO ()

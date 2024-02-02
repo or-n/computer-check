@@ -9,7 +9,7 @@ import Util (find_first)
 import Control.Applicative ((<|>))
 import qualified DistanceExtension
 import qualified ListExtension
-import Data.List (nub)
+import Data.List (nub, (\\))
 
 type Pair = (TermType, TermType)
 
@@ -58,35 +58,52 @@ gen_equations init_env init_target_type term = fst <$> result where
                 Just (x_equations ++ yes_equations ++ no_equations, env4)
         ListExtension extension -> case extension of
             ListExtension.End -> do
-                let item = "item"
-                let item_type = Generic item
-                Just ([(target_type, ForAll item (List item_type))], env)
+                let item_type = Generic ("let" ++ show (let_count env))
+                let env2 = env { let_count = let_count env + 1 }
+                Just ([(target_type, List item_type)], env2)
             ListExtension.Push top rest -> do
-                let item = "item"
-                let item_type = Generic item
-                (top_equations, env2) <- go env item_type top
-                (rest_equations, env3) <- go env2 (ForAll item (List item_type)) rest
+                let item_type = Generic ("let" ++ show (let_count env))
+                let env2 = env { let_count = let_count env + 1 }
+                (top_equations, env3) <- go env2 item_type top
+                (rest_equations, env4) <- go env3 (List item_type) rest
                 let both = top_equations ++ rest_equations
-                Just ((target_type, ForAll item (List item_type)) : both, env3)
+                Just ((target_type, List item_type) : both, env4)
             ListExtension.Top pair -> do
-                let item = "item"
-                let item_type = Generic item
-                (equations, env2) <- go env (ForAll item (List item_type)) pair
-                Just ((target_type, item_type) : equations, env2)
+                let item_type = Generic ("let" ++ show (let_count env))
+                let env2 = env { let_count = let_count env + 1 }
+                (equations, env3) <- go env2 (List item_type) pair
+                Just ((target_type, item_type) : equations, env3)
             ListExtension.Rest pair -> do
-                let item = "item"
-                let item_type = Generic item
-                (equations, env2) <- go env (ForAll item (List item_type)) pair
-                Just ((target_type, ForAll item (List item_type)) : equations, env2)
+                let item_type = Generic ("let" ++ show (let_count env))
+                let env2 = env { let_count = let_count env + 1 }
+                (equations, env3) <- go env2 (List item_type) pair
+                Just ((target_type, List item_type) : equations, env3)
             ListExtension.IfEmpty x yes no -> do
-                let item = "item"
-                let item_type = Generic item
-                (x_equations, env2) <- go env (ForAll item (List item_type)) x
-                (yes_equations, env3) <- go env2 target_type yes
-                (no_equations, env4) <- go env3 target_type no
-                Just (x_equations ++ yes_equations ++ no_equations, env4)
-        _ ->
-            Nothing
+                let item_type = Generic ("let" ++ show (let_count env))
+                let env2 = env { let_count = let_count env + 1 }
+                (x_equations, env3) <- go env2 (List item_type) x
+                (yes_equations, env4) <- go env3 target_type yes
+                (no_equations, env5) <- go env4 target_type no
+                Just (x_equations ++ yes_equations ++ no_equations, env5)
+        Define name definition usage -> do
+            let definition_type = Generic ("let" ++ show (let_count env))
+            let env2 = env
+                    { types = Map.insert name definition_type (types env)
+                    , let_count = let_count env + 1
+                    }
+            (definition_equations, env3) <- go env2 definition_type definition
+            (usage_equations, env4) <- go env3 target_type usage
+            Just (definition_equations ++ usage_equations, env4)
+
+-- 3.4.1
+generalize env term_type = foldr ForAll term_type names where
+    go = \case
+        Generic name -> [name]
+        Arrow from to -> go from ++ go to
+        Distance -> []
+        List item -> go item 
+        ForAll name usage -> nub (go usage) \\ [name]
+    names = nub (go term_type)
 
 data Env = Env
     { types :: Map.Map String TermType
@@ -111,7 +128,11 @@ occurs_in checked_name = go where
             name == checked_name
         Arrow from to ->
             go from || go to
-        Distance ->
+        List item ->
+            go item
+        ForAll name usage | name /= checked_name ->
+            go usage
+        _ ->
             False
 
 -- 2.5.2
@@ -124,13 +145,14 @@ substitute substituted_name substituted_type =
 -- 2.5.4
 resolve :: [Pair] -> IO [Pair]
 resolve equations =
-    if length equations > 1 then
-        resolve . shrink_modifying_rest . shrink . expand $ equations
+    if length equations > 1 then do
+        --print equations
+        resolve . nub . shrink_modifying_rest . shrink . expand $ equations
     else
         return equations
     where
-    expand = branch unification_step_match
-    shrink = branch unification_step_same
+    expand = branch unification_step_match_list . branch unification_step_match
+    shrink = branch unification_step_forall . branch unification_step_same
     shrink_modifying_rest xs = case find_first unification_step_let xs of
         Just (substitution, rest) -> substitution rest
         _ -> xs
@@ -154,6 +176,14 @@ resolve equations =
         (from_left, to_left) <- get_arrow left
         (from_right, to_right) <- get_arrow right
         Just [(from_left, from_right), (to_left, to_right)]
+    unification_step_forall pair = go pair <|> go (swap pair) where
+        go (left, right) = do
+            (name, usage) <- get_forall left
+            Just [(usage, right)]
+    unification_step_match_list (left, right) = do
+        left_item <- get_list left
+        right_item <- get_list right
+        Just [(left_item, right_item)]
 
 -- 2.5.4
 infer :: Term -> IO (Maybe TermType)

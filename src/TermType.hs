@@ -22,6 +22,16 @@ get_arrow = \case
     Arrow from to -> Just (from, to)
     _ -> Nothing
 
+get_list :: TermType -> Maybe TermType
+get_list = \case
+    List item -> Just item
+    _ -> Nothing
+
+get_forall :: TermType -> Maybe (String, TermType)
+get_forall = \case
+    ForAll name usage -> Just (name, usage)
+    _ -> Nothing
+
 -- 2.3.2
 instance Show TermType where
     show = go True where
@@ -45,4 +55,8 @@ substitute substituted_name substituted_type = go where
             substituted_type
         Arrow from to ->
             Arrow (go from) (go to)
+        List item ->
+            List (go item)
+        ForAll name usage | name /= substituted_name ->
+            ForAll name (go usage)
         x -> x
