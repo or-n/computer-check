@@ -8,6 +8,8 @@ data TermType
     = Generic String
     | Arrow TermType TermType
     | Distance
+    | List TermType
+    | ForAll String TermType
     deriving Eq
 
 get_generic :: TermType -> Maybe String
@@ -30,6 +32,10 @@ instance Show TermType where
                 parens in_parens $ concat [go True from, " -> ", go False to]
             Distance ->
                 "Distance"
+            List item ->
+                concat ["[", go False item, "]"]
+            ForAll name usage ->
+                parens in_parens $ concat ["forall ", name, ": ", go False usage]
 
 -- 2.5.2
 substitute :: String -> TermType -> TermType -> TermType

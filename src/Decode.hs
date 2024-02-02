@@ -31,7 +31,7 @@ decode = parse term "" where
         usage <- term
         return (Assume n usage)
     term = do
-        x <- try assume <|> extensions <|> try supply <|> atom
+        x <- parens term <|> try assume <|> extensions <|> try supply <|> atom
         suffix x
     define = do
         _ <- char '@'
@@ -81,7 +81,7 @@ decode = parse term "" where
             return (ListExtension.Push top' rest')
         if_empty = do
             x <- parens term
-            _ <- string " ()? "
+            _ <- string " e? "
             yes <- parens term
             _ <- string " : "
             no <- parens term

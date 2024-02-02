@@ -32,6 +32,11 @@ get_distance_extension = \case
 	DistanceExtension extension -> Just extension
 	_ -> Nothing
 
+get_list_extension :: Term -> Maybe (ListExtension.Term Term)
+get_list_extension = \case
+	ListExtension extension -> Just extension
+	_ -> Nothing
+
 instance Show Term where
 	show = show_parens True
 

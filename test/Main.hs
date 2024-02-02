@@ -25,7 +25,7 @@ main = do
     test "2 - 1"
     test "(x: x z? 42 : (f (x - 1))) 2"
     test "@f := (x: x z? 42 : (f (x - 1))) in f 2"
-    test "(2137, (69, ())).rest"
+    test "((2137, (69, ())).rest).top"
 
 test :: String -> IO ()
 test text = do

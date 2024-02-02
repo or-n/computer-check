@@ -8,6 +8,7 @@ import Data.Tuple (swap)
 import Util (find_first)
 import Control.Applicative ((<|>))
 import qualified DistanceExtension
+import qualified ListExtension
 import Data.List (nub)
 
 type Pair = (TermType, TermType)
@@ -52,6 +53,35 @@ gen_equations init_env init_target_type term = fst <$> result where
                 Just ((target_type, Distance) : both, env3)
             DistanceExtension.IfZero x yes no -> do
                 (x_equations, env2) <- go env Distance x
+                (yes_equations, env3) <- go env2 target_type yes
+                (no_equations, env4) <- go env3 target_type no
+                Just (x_equations ++ yes_equations ++ no_equations, env4)
+        ListExtension extension -> case extension of
+            ListExtension.End -> do
+                let item = "item"
+                let item_type = Generic item
+                Just ([(target_type, ForAll item (List item_type))], env)
+            ListExtension.Push top rest -> do
+                let item = "item"
+                let item_type = Generic item
+                (top_equations, env2) <- go env item_type top
+                (rest_equations, env3) <- go env2 (ForAll item (List item_type)) rest
+                let both = top_equations ++ rest_equations
+                Just ((target_type, ForAll item (List item_type)) : both, env3)
+            ListExtension.Top pair -> do
+                let item = "item"
+                let item_type = Generic item
+                (equations, env2) <- go env (ForAll item (List item_type)) pair
+                Just ((target_type, item_type) : equations, env2)
+            ListExtension.Rest pair -> do
+                let item = "item"
+                let item_type = Generic item
+                (equations, env2) <- go env (ForAll item (List item_type)) pair
+                Just ((target_type, ForAll item (List item_type)) : equations, env2)
+            ListExtension.IfEmpty x yes no -> do
+                let item = "item"
+                let item_type = Generic item
+                (x_equations, env2) <- go env (ForAll item (List item_type)) x
                 (yes_equations, env3) <- go env2 target_type yes
                 (no_equations, env4) <- go env3 target_type no
                 Just (x_equations ++ yes_equations ++ no_equations, env4)
