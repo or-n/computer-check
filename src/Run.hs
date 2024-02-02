@@ -76,7 +76,7 @@ strict_step term =
 				ListExtension.Rest pair -> do
 					case strict_step pair of
 						Just pair' ->
-							Just (ListExtension (ListExtension.Top pair'))
+							Just (ListExtension (ListExtension.Rest pair'))
 						_ -> do
 							(_, rest) <- push pair
 							Just rest

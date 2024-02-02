@@ -96,7 +96,7 @@ gen_equations init_env init_target_type term = fst <$> result where
             Just (definition_equations ++ usage_equations, env4)
 
 -- 3.4.1
-generalize env term_type = foldr ForAll term_type names where
+generalize term_type = foldr ForAll term_type names where
     go = \case
         Generic name -> [name]
         Arrow from to -> go from ++ go to
@@ -190,7 +190,7 @@ infer :: Term -> IO (Maybe TermType)
 infer term = case gen_equations empty_env (Generic "target") term of
     Just equations -> do
         result <- resolve (nub equations)
-        return $ case result of
+        return $ generalize <$> case result of
             [(Generic _, x)] -> Just x
             [(x, Generic _)] -> Just x
             _ -> Nothing
