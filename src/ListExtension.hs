@@ -28,7 +28,7 @@ instance ShowParens a => ShowParens (Term a) where
         End ->
             "()"
         Push top rest ->
-            try_parens should [show_parens False top, ", ", show_parens True rest]
+            try_parens True [show_parens False top, ", ", show_parens True rest]
         Top pair ->
             try_parens should [show_parens True pair, ".top"]
         Rest pair ->
