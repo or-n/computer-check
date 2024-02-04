@@ -11,8 +11,8 @@ import qualified DistanceExtension
 import qualified ListExtension
 import qualified RegionExtension
 import Data.List (nub, (\\))
-import Control.Monad.Trans.Maybe
 import Control.Monad.IO.Class
+import Control.Monad.Trans.Maybe
 
 type Pair = (TermType, TermType)
 
@@ -112,14 +112,21 @@ gen_equations init_env init_target_type term = (fst <$>) <$> result where
             RegionExtension.Region _ ->
                 return ([], env)
         Define name definition usage -> do
-            let definition_type = Generic ("let" ++ show (let_count env))
+            let target = Generic "target"
             let env2 = env
-                    { types = Map.insert name definition_type (types env)
+                    { types = Map.insert name target (types env)
                     , let_count = let_count env + 1
                     }
-            (definition_equations, env3) <- go env2 definition_type definition
-            (usage_equations, env4) <- go env3 target_type usage
-            return (definition_equations ++ usage_equations, env4)
+            (definition_equations, _) <- go env2 target definition
+            t <- liftIO $ resolve definition_equations
+            let full_t = generalize t
+            let env3 = env
+                    { types = Map.insert name full_t (types env)
+                    , let_count = let_count env + 1
+                    }
+            (new, env4) <- go env3 full_t definition
+            (usage_equations, env5) <- go env4 target_type usage
+            return (new ++ usage_equations, env5)
 
 -- 3.4.1
 generalize :: TermType -> TermType
