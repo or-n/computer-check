@@ -32,6 +32,7 @@ main = do
     test "x: xs: (x, xs)"
     test "()"
     test "() e? 1 : 2"
+    test "@x := (&2137) in @_ := (x <- ((*x) + 1)) in *x"
 
 test :: String -> IO ()
 test text = do

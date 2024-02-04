@@ -6,6 +6,7 @@ import Data.Maybe (fromMaybe)
 import Util (try_parens, UniqueNames, go, ShowParens, show_parens)
 import qualified DistanceExtension
 import qualified ListExtension
+import qualified RegionExtension
 
 -- 2.1.1
 data Term
@@ -15,6 +16,7 @@ data Term
 	-- 3.1
 	| DistanceExtension (DistanceExtension.Term Term)
 	| ListExtension (ListExtension.Term Term)
+	| RegionExtension (RegionExtension.Term Term)
 	| Define String Term Term
 
 get_assume :: Term -> Maybe (String, Term)
@@ -37,6 +39,11 @@ get_list_extension = \case
 	ListExtension extension -> Just extension
 	_ -> Nothing
 
+get_region_extension :: Term -> Maybe (RegionExtension.Term Term)
+get_region_extension = \case
+	RegionExtension extension -> Just extension
+	_ -> Nothing
+
 instance Show Term where
 	show = show_parens True
 
@@ -53,6 +60,8 @@ instance ShowParens Term where
 		DistanceExtension extension ->
 			show_parens should extension
 		ListExtension extension ->
+			show_parens should extension
+		RegionExtension extension ->
 			show_parens should extension
 		Define name definition usage ->
 			try_parens should ["@", name, " := ", show_parens True definition, " in ", show_parens False usage]
@@ -73,6 +82,8 @@ instance UniqueNames Term where
 			DistanceExtension (go bound extension)
 		ListExtension extension ->
 			ListExtension (go bound extension)
+		RegionExtension extension ->
+			RegionExtension (go bound extension)
 		Define name definition usage ->
 			Define new_name (go new_bound definition) (go new_bound usage)
 			where

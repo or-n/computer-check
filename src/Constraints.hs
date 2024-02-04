@@ -9,6 +9,7 @@ import Util (find_first)
 import Control.Applicative ((<|>))
 import qualified DistanceExtension
 import qualified ListExtension
+import qualified RegionExtension
 import Data.List (nub, (\\))
 
 type Pair = (TermType, TermType)
@@ -85,6 +86,15 @@ gen_equations init_env init_target_type term = fst <$> result where
                 (yes_equations, env4) <- go env3 target_type yes
                 (no_equations, env5) <- go env4 target_type no
                 Just (x_equations ++ yes_equations ++ no_equations, env5)
+        RegionExtension extension -> case extension of
+            RegionExtension.Reference value ->
+                Nothing
+            RegionExtension.Dereference region ->
+                Nothing
+            RegionExtension.Assign region value ->
+                Nothing
+            RegionExtension.Region index ->
+                Nothing
         Define name definition usage -> do
             let definition_type = Generic ("let" ++ show (let_count env))
             let env2 = env
@@ -103,6 +113,7 @@ generalize term_type = foldr ForAll term_type names where
         Distance -> []
         List item -> go item 
         ForAll name usage -> nub (go usage) \\ [name]
+        Region item -> go item
     names = nub (go term_type)
 
 data Env = Env
@@ -132,6 +143,8 @@ occurs_in checked_name = go where
             go item
         ForAll name usage | name /= checked_name ->
             go usage
+        Region item ->
+            go item
         _ ->
             False
 

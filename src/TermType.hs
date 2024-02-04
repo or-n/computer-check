@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 module TermType where
 
-import Util (parens)
+import Util (try_parens)
 
 -- 2.3.1
 data TermType
@@ -10,7 +10,8 @@ data TermType
     | Distance
     | List TermType
     | ForAll String TermType
-    deriving Eq
+    | Region TermType
+    deriving (Eq, Ord)
 
 get_generic :: TermType -> Maybe String
 get_generic = \case
@@ -35,17 +36,19 @@ get_forall = \case
 -- 2.3.2
 instance Show TermType where
     show = go True where
-        go in_parens = \case
+        go should = \case
             Generic name ->
                 name
             Arrow from to ->
-                parens in_parens $ concat [go True from, " -> ", go False to]
+                try_parens should [go True from, " -> ", go False to]
             Distance ->
                 "Distance"
             List item ->
                 concat ["[", go False item, "]"]
             ForAll name usage ->
-                parens in_parens $ concat ["forall ", name, ": ", go False usage]
+                try_parens should ["forall ", name, ": ", go False usage]
+            Region item ->
+                try_parens should ["Region ", go False item]
 
 -- 2.5.2
 substitute :: String -> TermType -> TermType -> TermType

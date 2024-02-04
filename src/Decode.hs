@@ -6,13 +6,14 @@ import Text.Parsec.String (Parser)
 import Term
 import qualified DistanceExtension
 import qualified ListExtension
+import qualified RegionExtension
 
 parens :: Parser a -> Parser a
 parens = between (char '(') (char ')')
 
 name :: Parser String
 name = do
-    first <- letter
+    first <- letter <|> char '_'
     rest <- many (letter <|> digit <|> char '_' <|> char '\'')
     return (first : rest)
 
@@ -41,7 +42,8 @@ decode = parse term "" where
         _ <- string " in "
         usage <- term
         return (Define n definition usage)
-    extensions = distance_extension <|> list_extension <|> define
+    extensions = distance_extension <|> list_extension <|> region_extension
+        <|> define
     distance_extension = DistanceExtension <$> (
         try add <|> try sub <|> try if_zero
         ) where
@@ -86,6 +88,22 @@ decode = parse term "" where
             _ <- string " : "
             no <- try atom <|> parens term
             return (ListExtension.IfEmpty x yes no)
+    region_extension = RegionExtension <$> (
+            try reference <|> try dereference <|> try assign
+        ) where
+        reference = do
+            _ <- char '&'
+            value <- term
+            return (RegionExtension.Reference value)
+        dereference = do
+            _ <- char '*'
+            region <- term
+            return (RegionExtension.Dereference region)
+        assign = do
+            region <- try atom <|> parens term
+            _ <- string " <- "
+            value <- try atom <|> parens term
+            return (RegionExtension.Assign region value)
     suffix :: Term -> Parser Term
     suffix x =
         try (top x) <|> try (rest x) <|> return x
