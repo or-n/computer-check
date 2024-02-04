@@ -32,12 +32,13 @@ main = do
     test "@l := (&()) in @_ := (l <- ((x: x), ())) in ((*l).top) + 1"
     --test_equations "@x := (&2137) in *x"
 
+{-
 test_equations code = do
-    let r = gen_equations empty_env (Generic "target") <$> decode code
+    r <- gen_equations empty_env (Generic "target") <$> decode code
     case r of
-        Right (Just equations) -> do
+        Just equations -> do
             x <- resolve equations
-            print x
+            print x-}
 
 test :: String -> IO ()
 test text = do

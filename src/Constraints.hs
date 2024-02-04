@@ -11,23 +11,26 @@ import qualified DistanceExtension
 import qualified ListExtension
 import qualified RegionExtension
 import Data.List (nub, (\\))
+import Control.Monad.Trans.Maybe
+import Control.Monad.IO.Class
 
 type Pair = (TermType, TermType)
 
 -- 2.4
-gen_equations :: Env -> TermType -> Term -> Maybe [Pair]
-gen_equations init_env init_target_type term = fst <$> result where
-    result = go init_env init_target_type term
+gen_equations :: Env -> TermType -> Term -> IO (Maybe [Pair])
+gen_equations init_env init_target_type term = (fst <$>) <$> result where
+    result = runMaybeT $ go init_env init_target_type term
+    m = MaybeT . return
     go env target_type = \case
         Refer name -> do
-            found_type <- Map.lookup name (types env)
-            Just ([(found_type, target_type)], env)
+            found_type <- m $ Map.lookup name (types env)
+            return ([(found_type, target_type)], env)
         Supply process input -> do
             let input_type = Generic ("let" ++ show (let_count env))
             let env2 = env { let_count = let_count env + 1 }
             (process_equations, env3) <- go env2 (Arrow input_type target_type) process
             (input_equations, env4) <- go env3 input_type input
-            Just (process_equations ++ input_equations, env4)
+            return (process_equations ++ input_equations, env4)
         Assume name usage -> do
             let from = Generic ("a" ++ show (from_count env))
             let to = Generic ("r" ++ show (to_count env))
@@ -37,32 +40,32 @@ gen_equations init_env init_target_type term = fst <$> result where
                     , to_count = to_count env + 1
                     }
             (usage_equations, env3) <- go env2 to usage
-            Just ((target_type, Arrow from to) : usage_equations, env3)
+            return ((target_type, Arrow from to) : usage_equations, env3)
         -- 3.2
         DistanceExtension extension -> case extension of
             DistanceExtension.Value _ ->
-                Just ([(target_type, Distance)], env)
+                return ([(target_type, Distance)], env)
             DistanceExtension.Add a b -> do
                 (a_equations, env2) <- go env Distance a
                 (b_equations, env3) <- go env2 Distance b
                 let both = a_equations ++ b_equations
-                Just ((target_type, Distance) : both, env3)
+                return ((target_type, Distance) : both, env3)
             DistanceExtension.Sub a b -> do
                 (a_equations, env2) <- go env Distance a
                 (b_equations, env3) <- go env2 Distance b
                 let both = a_equations ++ b_equations
-                Just ((target_type, Distance) : both, env3)
+                return ((target_type, Distance) : both, env3)
             DistanceExtension.IfZero x yes no -> do
                 (x_equations, env2) <- go env Distance x
                 (yes_equations, env3) <- go env2 target_type yes
                 (no_equations, env4) <- go env3 target_type no
-                Just (x_equations ++ yes_equations ++ no_equations, env4)
+                return (x_equations ++ yes_equations ++ no_equations, env4)
         ListExtension extension -> case extension of
             ListExtension.End -> do
                 let item = "let" ++ show (let_count env)
                 let item_type = Generic item
                 let env2 = env { let_count = let_count env + 1 }
-                Just ([(target_type, ForAll item (List item_type))], env2)
+                return ([(target_type, ForAll item (List item_type))], env2)
             ListExtension.Push top rest -> do
                 let item = "let" ++ show (let_count env)
                 let item_type = Generic item
@@ -70,44 +73,44 @@ gen_equations init_env init_target_type term = fst <$> result where
                 (top_equations, env3) <- go env2 item_type top
                 (rest_equations, env4) <- go env3 (List item_type) rest
                 let both = top_equations ++ rest_equations
-                Just ((target_type, ForAll item (List item_type)) : both, env4)
+                return ((target_type, ForAll item (List item_type)) : both, env4)
             ListExtension.Top pair -> do
                 let item_type = Generic ("let" ++ show (let_count env))
                 let env2 = env { let_count = let_count env + 1 }
                 (equations, env3) <- go env2 (List item_type) pair
-                Just ((target_type, item_type) : equations, env3)
+                return ((target_type, item_type) : equations, env3)
             ListExtension.Rest pair -> do
                 let item_type = Generic ("let" ++ show (let_count env))
                 let env2 = env { let_count = let_count env + 1 }
                 (equations, env3) <- go env2 (List item_type) pair
-                Just ((target_type, List item_type) : equations, env3)
+                return ((target_type, List item_type) : equations, env3)
             ListExtension.IfEmpty x yes no -> do
                 let item_type = Generic ("let" ++ show (let_count env))
                 let env2 = env { let_count = let_count env + 1 }
                 (x_equations, env3) <- go env2 (List item_type) x
                 (yes_equations, env4) <- go env3 target_type yes
                 (no_equations, env5) <- go env4 target_type no
-                Just (x_equations ++ yes_equations ++ no_equations, env5)
+                return (x_equations ++ yes_equations ++ no_equations, env5)
         RegionExtension extension -> case extension of
             RegionExtension.Reference value -> do
                 let item_type = Generic ("let" ++ show (let_count env))
                 let env2 = env { let_count = let_count env + 1 }
                 (value_equations, env3) <- go env2 item_type value
-                Just ((target_type, Region item_type) : value_equations, env3)
+                return ((target_type, Region item_type) : value_equations, env3)
             RegionExtension.Dereference region -> do
                 let region_type = Generic ("let" ++ show (let_count env))
                 let env2 = env { let_count = let_count env + 1 }
                 (region_equations, env3) <- go env2 region_type region
-                Just ((Region target_type, region_type) : region_equations, env3)
+                return ((Region target_type, region_type) : region_equations, env3)
             RegionExtension.Assign region value -> do
                 let item_type = Generic ("let" ++ show (let_count env))
                 let env2 = env { let_count = let_count env + 1 }
                 (region_equations, env3) <- go env2 (Region item_type) region
                 (value_equations, env4) <- go env3 item_type value
                 let both = region_equations ++ value_equations
-                Just ((target_type, End) : both, env4)
+                return ((target_type, End) : both, env4)
             RegionExtension.Region _ ->
-                Just ([], env)
+                return ([], env)
         Define name definition usage -> do
             let definition_type = Generic ("let" ++ show (let_count env))
             let env2 = env
@@ -116,7 +119,7 @@ gen_equations init_env init_target_type term = fst <$> result where
                     }
             (definition_equations, env3) <- go env2 definition_type definition
             (usage_equations, env4) <- go env3 target_type usage
-            Just (definition_equations ++ usage_equations, env4)
+            return (definition_equations ++ usage_equations, env4)
 
 -- 3.4.1
 generalize :: TermType -> TermType
@@ -250,6 +253,8 @@ polymorhic_match polymorphic_name usage other = case (usage, other) of
 
 -- 2.5.4
 infer :: Term -> IO (Maybe TermType)
-infer term = case gen_equations empty_env (Generic "target") term of
-    Just equations -> resolve (nub equations) >>= return . Just . generalize
-    _ -> return Nothing
+infer term = do
+    r <- gen_equations empty_env (Generic "target") term
+    case r of
+        Just equations -> resolve (nub equations) >>= return . Just . generalize
+        _ -> return Nothing
