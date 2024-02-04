@@ -40,7 +40,7 @@ gen_equations init_env init_target_type term = fst <$> result where
             Just ((target_type, Arrow from to) : usage_equations, env3)
         -- 3.2
         DistanceExtension extension -> case extension of
-            DistanceExtension.Value distance ->
+            DistanceExtension.Value _ ->
                 Just ([(target_type, Distance)], env)
             DistanceExtension.Add a b -> do
                 (a_equations, env2) <- go env Distance a
@@ -87,14 +87,25 @@ gen_equations init_env init_target_type term = fst <$> result where
                 (no_equations, env5) <- go env4 target_type no
                 Just (x_equations ++ yes_equations ++ no_equations, env5)
         RegionExtension extension -> case extension of
-            RegionExtension.Reference value ->
-                Nothing
-            RegionExtension.Dereference region ->
-                Nothing
-            RegionExtension.Assign region value ->
-                Nothing
-            RegionExtension.Region index ->
-                Nothing
+            RegionExtension.Reference value -> do
+                let item_type = Generic ("let" ++ show (let_count env))
+                let env2 = env { let_count = let_count env + 1 }
+                (value_equations, env3) <- go env2 item_type value
+                Just ((target_type, Region item_type) : value_equations, env3)
+            RegionExtension.Dereference region -> do
+                let region_type = Generic ("let" ++ show (let_count env))
+                let env2 = env { let_count = let_count env + 1 }
+                (region_equations, env3) <- go env2 region_type region
+                Just ((Region target_type, region_type) : region_equations, env3)
+            RegionExtension.Assign region value -> do
+                let item_type = Generic ("let" ++ show (let_count env))
+                let env2 = env { let_count = let_count env + 1 }
+                (region_equations, env3) <- go env2 (Region item_type) region
+                (value_equations, env4) <- go env3 item_type value
+                let both = region_equations ++ value_equations
+                Just ((target_type, End) : both, env4)
+            RegionExtension.Region _ ->
+                Just ([], env)
         Define name definition usage -> do
             let definition_type = Generic ("let" ++ show (let_count env))
             let env2 = env
@@ -106,6 +117,7 @@ gen_equations init_env init_target_type term = fst <$> result where
             Just (definition_equations ++ usage_equations, env4)
 
 -- 3.4.1
+generalize :: TermType -> TermType
 generalize term_type = foldr ForAll term_type names where
     go = \case
         Generic name -> [name]
@@ -114,6 +126,7 @@ generalize term_type = foldr ForAll term_type names where
         List item -> go item 
         ForAll name usage -> nub (go usage) \\ [name]
         Region item -> go item
+        End -> []
     names = nub (go term_type)
 
 data Env = Env
@@ -156,15 +169,17 @@ substitute substituted_name substituted_type =
     go = TermType.substitute substituted_name substituted_type
 
 -- 2.5.4
-resolve :: [Pair] -> IO [Pair]
-resolve equations =
-    if length equations > 1 then do
+resolve :: [Pair] -> IO TermType
+resolve = \case
+    [] -> return End
+    [(Generic _, x)] -> return x
+    [(x, Generic _)] -> return x
+    equations -> do
         --print equations
-        resolve . nub . shrink_modifying_rest . shrink . expand $ equations
-    else
-        return equations
+        let f = if length equations > 1 then shrink_modifying_rest else id
+        resolve . nub . f . shrink . expand $ equations
     where
-    expand = branch unification_step_match_list . branch unification_step_match
+    expand = branch match_region . branch match_list . branch match_arrow
     shrink = branch unification_step_forall . branch unification_step_same
     shrink_modifying_rest xs = case find_first unification_step_let xs of
         Just (substitution, rest) -> substitution rest
@@ -185,26 +200,25 @@ resolve equations =
                 Nothing
             else
                 Just (Constraints.substitute name right)
-    unification_step_match (left, right) = do
+    match_arrow (left, right) = do
         (from_left, to_left) <- get_arrow left
         (from_right, to_right) <- get_arrow right
         Just [(from_left, from_right), (to_left, to_right)]
     unification_step_forall pair = go pair <|> go (swap pair) where
         go (left, right) = do
-            (name, usage) <- get_forall left
+            (_, usage) <- get_forall left
             Just [(usage, right)]
-    unification_step_match_list (left, right) = do
+    match_list (left, right) = do
         left_item <- get_list left
         right_item <- get_list right
+        Just [(left_item, right_item)]
+    match_region (left, right) = do
+        left_item <- get_region left
+        right_item <- get_region right
         Just [(left_item, right_item)]
 
 -- 2.5.4
 infer :: Term -> IO (Maybe TermType)
 infer term = case gen_equations empty_env (Generic "target") term of
-    Just equations -> do
-        result <- resolve (nub equations)
-        return $ generalize <$> case result of
-            [(Generic _, x)] -> Just x
-            [(x, Generic _)] -> Just x
-            _ -> Nothing
+    Just equations -> resolve (nub equations) >>= return . Just . generalize
     _ -> return Nothing

@@ -2,6 +2,7 @@
 module RegionExtension where
 
 import Util (
+    try_parens,
     UniqueNames,
     go,
     ShowParens,
@@ -10,6 +11,7 @@ import Util (
     substitute
     )
 
+-- 4.1
 data Term a
     = Reference a
     | Dereference a
@@ -23,13 +25,13 @@ get_region = \case
 instance ShowParens a => ShowParens (Term a) where
     show_parens should = \case
         Reference value ->
-            concat ["&", show_parens should value]
+            try_parens should ["&", show_parens should value]
         Dereference region ->
-            concat ["*", show_parens should region]
+            try_parens should ["*", show_parens should region]
         Assign region value ->
-            concat [show_parens True region, " <- ", show_parens True value]
+            try_parens should [show_parens True region, " <- ", show_parens True value]
         Region index ->
-            concat ["#", show index]
+            try_parens should ["#", show index]
 
 instance UniqueNames a => UniqueNames (Term a) where
     go bound = \case

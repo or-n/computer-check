@@ -10,7 +10,9 @@ data TermType
     | Distance
     | List TermType
     | ForAll String TermType
+    -- 4.3
     | Region TermType
+    | End
     deriving (Eq, Ord)
 
 get_generic :: TermType -> Maybe String
@@ -33,6 +35,11 @@ get_forall = \case
     ForAll name usage -> Just (name, usage)
     _ -> Nothing
 
+get_region :: TermType -> Maybe TermType
+get_region = \case
+    Region item -> Just item
+    _ -> Nothing
+
 -- 2.3.2
 instance Show TermType where
     show = go True where
@@ -48,7 +55,9 @@ instance Show TermType where
             ForAll name usage ->
                 try_parens should ["forall ", name, ": ", go False usage]
             Region item ->
-                try_parens should ["Region ", go False item]
+                concat ["Region ", go True item]
+            End ->
+                "()"
 
 -- 2.5.2
 substitute :: String -> TermType -> TermType -> TermType
@@ -62,4 +71,6 @@ substitute substituted_name substituted_type = go where
             List (go item)
         ForAll name usage | name /= substituted_name ->
             ForAll name (go usage)
+        Region item ->
+            Region (go item)
         x -> x
