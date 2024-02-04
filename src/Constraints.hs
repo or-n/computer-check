@@ -59,16 +59,18 @@ gen_equations init_env init_target_type term = fst <$> result where
                 Just (x_equations ++ yes_equations ++ no_equations, env4)
         ListExtension extension -> case extension of
             ListExtension.End -> do
-                let item_type = Generic ("let" ++ show (let_count env))
+                let item = "let" ++ show (let_count env)
+                let item_type = Generic item
                 let env2 = env { let_count = let_count env + 1 }
-                Just ([(target_type, List item_type)], env2)
+                Just ([(target_type, ForAll item (List item_type))], env2)
             ListExtension.Push top rest -> do
-                let item_type = Generic ("let" ++ show (let_count env))
+                let item = "let" ++ show (let_count env)
+                let item_type = Generic item
                 let env2 = env { let_count = let_count env + 1 }
                 (top_equations, env3) <- go env2 item_type top
                 (rest_equations, env4) <- go env3 (List item_type) rest
                 let both = top_equations ++ rest_equations
-                Just ((target_type, List item_type) : both, env4)
+                Just ((target_type, ForAll item (List item_type)) : both, env4)
             ListExtension.Top pair -> do
                 let item_type = Generic ("let" ++ show (let_count env))
                 let env2 = env { let_count = let_count env + 1 }
@@ -206,8 +208,8 @@ resolve = \case
         Just [(from_left, from_right), (to_left, to_right)]
     unification_step_forall pair = go pair <|> go (swap pair) where
         go (left, right) = do
-            (_, usage) <- get_forall left
-            Just [(usage, right)]
+            (name, usage) <- get_forall left
+            polymorhic_match name usage right
     match_list (left, right) = do
         left_item <- get_list left
         right_item <- get_list right
@@ -216,6 +218,35 @@ resolve = \case
         left_item <- get_region left
         right_item <- get_region right
         Just [(left_item, right_item)]
+
+polymorhic_match :: String -> TermType -> TermType -> Maybe [Pair]
+polymorhic_match polymorphic_name usage other = case (usage, other) of
+    (Generic name1, Generic name2) | name1 == name2 ->
+        Just []
+    (Generic _, _) ->
+        Just [(usage, other)]
+    (_, Generic _) ->
+        Just [(usage, other)]
+    (Arrow from1 to1, Arrow from2 to2) -> do
+        from_equations <- go from1 from2
+        top_equations <- go to1 to2
+        Just (from_equations ++ top_equations)
+    (Distance, Distance) ->
+        Just []
+    (List item1, List item2) ->
+        go item1 item2
+    (ForAll name1 usage1, _) ->
+        polymorhic_match name1 usage1 other
+    (_, ForAll name2 usage2) ->
+        polymorhic_match name2 usage2 usage
+    (Region item1, Region item2) ->
+        go item1 item2
+    (End, End) ->
+        Just []
+    _ ->
+        Nothing
+    where
+    go = polymorhic_match polymorphic_name
 
 -- 2.5.4
 infer :: Term -> IO (Maybe TermType)
