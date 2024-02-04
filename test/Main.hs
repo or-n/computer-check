@@ -28,6 +28,8 @@ main = do
     test "()"
     test "() e? 1 : 2"
     test "@x := (&2137) in @_ := (x <- ((*x) + 1)) in *x"
+    test "@l := (&()) in @_ := (l <- ((x: x), ())) in (*l)"
+    test "@l := (&()) in @_ := (l <- ((x: x), ())) in ((*l).top) + 1"
     --test_equations "@x := (&2137) in *x"
 
 test_equations code = do
